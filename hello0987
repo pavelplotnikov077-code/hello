@@ -1,0 +1,245 @@
+Разберу задачу пошагово — от настройки проекта до финального README.
+
+## Шаг 1. Настройка проекта и Git
+
+1. Создайте локальную папку для проекта:
+```bash
+mkdir github-user-finder
+cd github-user-finder
+```
+2. Инициализируйте Git‑репозиторий:
+```bash
+git init
+```
+3. Создайте файл `.gitignore` со следующим содержимым:
+```
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+.DS_Store
+Thumbs.db
+```
+4. Совершите первый коммит:
+```bash
+git add .
+git commit -m "Initial commit: project setup"
+```
+
+## Шаг 2. Выбор технологий и установка зависимостей
+
+Для реализации GUI подойдёт библиотека `tkinter` (встроена в Python), для работы с API — `requests`. Установите последнюю:
+```bash
+pip install requests
+```
+
+## Шаг 3. Структура проекта
+
+Создайте файлы:
+* `main.py` — основной код приложения;
+* `favorites.json` — для хранения избранных пользователей;
+* `README.md` — документация.
+
+## Шаг 4. Код приложения (`main.py`)
+
+```python
+import tkinter as tk
+from tkinter import messagebox, ttk
+import requests
+import json
+import os
+
+# Путь к файлу с избранными пользователями
+FAVORITES_FILE = "favorites.json"
+
+class GitHubUserFinder:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("GitHub User Finder")
+        self.root.geometry("600x500")
+
+        # Загрузка избранных пользователей
+        self.favorites = self.load_favorites()
+
+        self.setup_ui()
+
+    def setup_ui(self):
+        # Поле ввода
+        tk.Label(self.root, text="Введите имя пользователя GitHub:").pack(pady=5)
+        self.search_entry = tk.Entry(self.root, width=50)
+        self.search_entry.pack(pady=5)
+
+        # Кнопка поиска
+        search_button = tk.Button(self.root, text="Найти", command=self.search_user)
+        search_button.pack(pady=5)
+
+        # Список результатов
+        self.results_listbox = tk.Listbox(self.root, height=10, width=70)
+        self.results_listbox.pack(pady=10)
+
+        # Кнопка добавления в избранное
+        add_favorite_button = tk.Button(
+            self.root,
+            text="Добавить в избранное",
+            command=self.add_to_favorites
+        )
+        add_favorite_button.pack(pady=5)
+
+        # Список избранных
+        tk.Label(self.root, text="Избранные пользователи:").pack(pady=5)
+        self.favorites_listbox = tk.Listbox(self.root, height=8, width=70)
+        self.favorites_listbox.pack(pady=10)
+        self.update_favorites_display()
+
+    def search_user(self):
+        username = self.search_entry.get().strip()
+        if not username:
+            messagebox.showerror("Ошибка", "Поле поиска не должно быть пустым!")
+            return
+
+        try:
+            response = requests.get(f"https://api.github.com/users/{username}")
+            if response.status_code == 200:
+                user_data = response.json()
+                self.display_user(user_data)
+            else:
+                messagebox.showerror("Ошибка", f"Пользователь '{username}' не найден.")
+        except requests.RequestException as e:
+            messagebox.showerror("Ошибка сети", f"Не удалось подключиться к GitHub API: {e}")
+
+    def display_user(self, user_data):
+        self.results_listbox.delete(0, tk.END)
+        info = f"{user_data['login']} - {user_data.get('name', 'No name')} ({user_data['public_repos']} repos)"
+        self.results_listbox.insert(tk.END, info)
+
+    def add_to_favorites(self):
+        selection = self.results_listbox.curselection()
+        if not selection:
+            messagebox.showwarning("Предупреждение", "Выберите пользователя из списка результатов.")
+            return
+
+        user_info = self.results_listbox.get(selection[0])
+        username = user_info.split(" - ")[0]
+
+        if username not in self.favorites:
+            self.favorites.append(username)
+            self.save_favorites()
+            self.update_favorites_display()
+            messagebox.showinfo("Успех", f"{username} добавлен в избранное!")
+        else:
+            messagebox.showinfo("Информация", f"{username} уже в избранном.")
+
+    def load_favorites(self):
+        if os.path.exists(FAVORITES_FILE):
+            with open(FAVORITES_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        return []
+
+    def save_favorites(self):
+        with open(FAVORITES_FILE, "w", encoding="utf-8") as f:
+            json.dump(self.favorites, f, ensure_ascii=False, indent=4)
+
+    def update_favorites_display(self):
+        self.favorites_listbox.delete(0, tk.END)
+        for user in self.favorites:
+            self.favorites_listbox.insert(tk.END, user)
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = GitHubUserFinder(root)
+    root.mainloop()
+```
+
+## Шаг 5. Создание `favorites.json`
+
+Создайте пустой файл `favorites.json`:
+```json
+[]
+```
+
+## Шаг 6. Написание README.md
+
+Создайте файл `README.md` со следующим содержимым:
+
+```markdown
+# GitHub User Finder
+
+**Автор:** [Ваше Имя Фамилия]
+
+## Описание
+
+Приложение «GitHub User Finder» позволяет искать пользователей GitHub по имени, просматривать их основную информацию и сохранять избранных в локальный JSON‑файл. Реализовано с использованием GitHub API и графического интерфейса на `tkinter`.
+
+## Технологии
+
+* Python 3
+* tkinter (GUI)
+* requests (работа с API)
+* JSON (хранение данных)
+
+## Как использовать API GitHub
+
+Приложение использует публичный GitHub API (без аутентификации). Для поиска пользователя отправляется GET‑запрос на URL:
+
+```
+https://api.github.com/users/{username}
+```
+
+Где `{username}` — имя искомого пользователя. В ответе возвращается JSON с данными пользователя (логин, имя, количество публичных репозиториев и т. д.).
+
+## Инструкция по запуску
+
+1. Убедитесь, что у вас установлен Python 3.6+ и pip.
+2. Клонируйте репозиторий или скачайте файлы проекта.
+3. Установите зависимость: `pip install requests`.
+4. Запустите приложение: `python main.py`.
+5. Введите имя пользователя GitHub в поле ввода и нажмите «Найти».
+6. Чтобы добавить пользователя в избранное, выберите его в списке результатов и нажмите «Добавить в избранное».
+
+## Примеры использования
+
+**Тест 1: успешный поиск**
+
+1. Введите `octocat` (известный тестовый аккаунт GitHub).
+2. Нажмите «Найти».
+3. В списке результатов появится информация о пользователе.
+4. Добавьте его в избранное.
+
+**Тест 2: некорректный ввод**
+
+1. Оставьте поле поиска пустым.
+2. Нажмите «Найти».
+3. Должно появиться сообщение об ошибке: «Поле поиска не должно быть пустым!».
+
+**Тест 3: несуществующий пользователь**
+
+1. Введите случайный набор символов, например, `asdfghjkl12345`.
+2. Нажмите «Найти».
+3. Должно появиться сообщение: «Пользователь 'asdfghjkl12345' не найден».
+
+## Структура проекта
+
+* `main.py` — основной код приложения.
+* `favorites.json` — файл для хранения избранных пользователей.
+* `.gitignore` — файлы, игнорируемые Git.
+* `README.md` — эта документация.
+```
+
+---
+
+## Финальные шаги
+
+1. Сохраните все файлы.
+2. Зафиксируйте изменения в Git:
+```bash
+git add .
+git commit -m "Complete GitHub User Finder with GUI and favorites"
+```
+3. (Опционально) Создайте репозиторий на GitHub и свяжите локальный репозиторий с удалённым:
+```bash
+git remote add origin <URL вашего репозитория>
+git push -
