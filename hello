@@ -1,0 +1,127 @@
+import tkinter as tk
+from tkinter import ttk, messagebox, filedialog
+import json
+import random
+from datetime import datetime
+
+
+
+class TaskManager:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Менеджер задач")
+        self.root.geometry("800x600")
+
+        self.tasks = []
+        self.load_tasks()
+
+        self.setup_ui()
+        self.refresh_task_list()
+
+    def setup_ui(self):
+        # Основной фрейм
+        main_frame = ttk.Frame(self.root, padding="10")
+        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+
+        # Фрейм добавления задачи
+        add_frame = ttk.LabelFrame(main_frame, text="Добавить задачу", padding="10")
+        add_frame.grid(row=0, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(0, 10))
+
+        ttk.Label(add_frame, text="Название:").grid(row=0, column=0, sticky=tk.W)
+        self.title_entry = ttk.Entry(add_frame, width=40)
+        self.title_entry.grid(row=0, column=1, padx=(5, 0), sticky=(tk.W, tk.E))
+
+        ttk.Label(add_frame, text="Описание:").grid(row=1, column=0, sticky=tk.W, pady=(5, 0))
+        self.desc_entry = tk.Text(add_frame, height=3, width=40)
+        self.desc_entry.grid(row=1, column=1, padx=(5, 0), pady=(5, 0), sticky=(tk.W, tk.E))
+
+        ttk.Label(add_frame, text="Приоритет:").grid(row=2, column=0, sticky=tk.W, pady=(5, 0))
+        self.priority_var = tk.StringVar(value="Средний")
+        ttk.Combobox(add_frame, textvariable=self.priority_var,
+                   values=["Высокий", "Средний", "Низкий"]).grid(row=2, column=1,
+                   padx=(5, 0), pady=(5, 0), sticky=(tk.W, tk.E))
+
+        ttk.Label(add_frame, text="Статус:").grid(row=3, column=0, sticky=tk.W, pady=(5, 0))
+        self.status_var = tk.StringVar(value="В работе")
+        ttk.Combobox(add_frame, textvariable=self.status_var,
+                   values=["В работе", "Завершен", "Отложен"]).grid(row=3, column=1,
+                   padx=(5, 0), pady=(5, 0), sticky=(tk.W, tk.E))
+
+        ttk.Button(add_frame, text="Добавить задачу", command=self.add_task).grid(
+            row=4, column=0, columnspan=2, pady=(10, 0))
+
+        # Фрейм фильтрации
+        filter_frame = ttk.LabelFrame(main_frame, text="Фильтрация", padding="10")
+        filter_frame.grid(row=1, column=0, sticky=(tk.W, tk.E), pady=(0, 10))
+
+        ttk.Label(filter_frame, text="Фильтр по статусу:").grid(row=0, column=0, sticky=tk.W)
+        self.filter_status_var = tk.StringVar(value="Все")
+        ttk.Combobox(filter_frame, textvariable=self.filter_status_var,
+                   values=["Все", "В работе", "Завершен", "Отложен"],
+                   width=15).grid(row=0, column=1, padx=(5, 0), sticky=tk.W)
+
+        ttk.Label(filter_frame, text="Фильтр по приоритету:").grid(row=1, column=0, sticky=tk.W, pady=(5, 0))
+        self.filter_priority_var = tk.StringVar(value="Все")
+        ttk.Combobox(filter_frame, textvariable=self.filter_priority_var,
+                   values=["Все", "Высокий", "Средний", "Низкий"],
+                   width=15).grid(row=1, column=1, padx=(5, 0), pady=(5, 0), sticky=tk.W)
+
+        ttk.Button(filter_frame, text="Применить фильтры", command=self.refresh_task_list).grid(
+            row=2, column=0, columnspan=2, pady=(10, 0))
+
+        # Фрейм списка задач
+        list_frame = ttk.LabelFrame(main_frame, text="Список задач", padding="10")
+        list_frame.grid(row=2, column=0, columnspan=2, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(0, 10))
+
+        columns = ("ID", "Название", "Приоритет", "Статус", "Дата создания")
+        self.task_tree = ttk.Treeview(list_frame, columns=columns, show="headings", height=15)
+
+        for col in columns:
+            self.task_tree.heading(col, text=col)
+            self.task_tree.column(col, width=120)
+
+        self.task_tree.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+
+        scrollbar = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=self.task_tree.yview)
+        scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
+        self.task_tree.configure(yscrollcommand=scrollbar.set)
+
+        # Кнопки управления
+        button_frame = ttk.Frame(main_frame)
+        button_frame.grid(row=3, column=0, columnspan=2, pady=(0, 10))
+
+        ttk.Button(button_frame, text="Удалить выбранную", command=self.delete_task).pack(side=tk.LEFT, padx=(0, 5))
+        ttk.Button(button_frame, text="Сгенерировать случайные", command=self.generate_random_tasks).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Сохранить в JSON", command=self.save_tasks).pack(side=tk.LEFT, padx=5)
+
+    def validate_input(self, title):
+        if not title.strip():
+            messagebox.showerror("Ошибка", "Название задачи не может быть пустым!")
+            return False
+        if len(title) > 100:
+            messagebox.showerror("Ошибка", "Название не должно превышать 100 символов!")
+            return False
+        return True
+
+    def add_task(self):
+        title = self.title_entry.get()
+        if not self.validate_input(title):
+            return
+
+        task = {
+            "id": len(self.tasks) + 1,
+            "title": title,
+            "description": self.desc_entry.get("1.0", tk.END).strip(),
+            "priority": self.priority_var.get(),
+            "status": self.status_var.get(),
+            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+
+        self.tasks.append(task)
+        self.refresh_task_list()
+        self.clear_input_fields()
+
+    def delete_task(self):
+        selected = self.task_tree.selection()
+        if selected:
+            task_id = int
